@@ -20,8 +20,9 @@ Um die healBox in Betrieb zu nehmen muss der Raspberry Pi mit dem Stromnetz verb
 ` git clone https://github.com/awareseven/healbox `
 - Anschließend geben Sie folgenden Befehl ein:
 ` cd healbox `
-- Danach geben Sie folgenden Befehl ein. Wenn Sie nach dem Passwort gefragt werden, tippen Sie "raspberry" ein:
+- Danach geben Sie folgenden Befehl ein:
 `sudo ./healbox.sh`
+Wenn Sie nach dem Passwort gefragt werden, tippen Sie "raspberry" ein.
 - Folgen Sie der Installation und geben Sie an den entsprechenden Stellen Informationen ein, beispielweise Ihr neues Passwort.
 
 
