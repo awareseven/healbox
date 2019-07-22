@@ -31,7 +31,7 @@ Im Anschluss an diese Installation sollten Sie Thunderbird starten und Ihr Mailp
 * Allgemeines E-Mail Konto konfigurieren: https://support.mozilla.org/de/kb/konto-einrichten
 * GMail-Konto konfigurieren: https://support.mozilla.org/de/kb/thunderbird-und-gmail
 
-Nachdem Sie dies erfolgreich durchgeführt haben, sollten Sie Ihre E-Mails auch auf dem Raspberry Pi empfangen können. Erhalten Sie nun eine Mail die Ihnen verdächtig vorkommt können Sie diese zuerst auf dem Raspberry Pi öffnen. Dies ist weniger gefährlich als auf Ihrem Windowsrechner, da die meiste Mal- und Ransomware nicht auf der speziellen Hard & Softwarekombination funktioniert, aus der ein Raspberry Pi besteht.
+Nachdem Sie dies erfolgreich durchgeführt haben, sollten Sie Ihre E-Mails auch auf dem Raspberry Pi empfangen können. Erhalten Sie nun eine Mail die Ihnen verdächtig vorkommt können Sie diese zuerst auf dem Raspberry Pi öffnen. Dies ist weniger gefährlich als auf Ihrem Windowsrechner, da die meiste Mal- und Ransomware nicht auf der speziellen Hard & Softwarekombination funktioniert, aus der ein Raspberry Pi besteht. Durch die Härtung des Raspberry Pis mit unserem Healbox Skript verringern Sie die Angriffsfläche für einen Angreifer.
 
 ## Zusätzliche Informationen
 
