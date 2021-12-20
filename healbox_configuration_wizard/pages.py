@@ -1,25 +1,24 @@
+import string, random
 import gi
 gi.require_version("Gtk", "3.0")
-
 from gi.repository import Gtk, Gdk
-
-import string, random
-
-def rand_string(strlen: int):
-    return ''.join(random.choice(
-        string.ascii_letters + string.digits
-    ) for _ in range(strlen))
 
 class PageContainer(Gtk.VBox):
     title: str = "Page Title"
     page_type: int = Gtk.AssistantPageType.CONTENT
     completed: bool = True
-    username: str = "hb-" + rand_string(3)
-    hostname: str = "healbox-" + rand_string(6)
 
     def __init__(self):
         super().__init__()
         self.set_valign(Gtk.Align.CENTER)
+
+    def rand_string(strlen: int):
+        return ''.join(random.choice(
+            string.ascii_letters + string.digits
+        ) for _ in range(strlen))
+
+    username: str = "hb-" + rand_string(3)
+    hostname: str = "healbox-" + rand_string(6)
 
 
 class PageIntro(PageContainer):
