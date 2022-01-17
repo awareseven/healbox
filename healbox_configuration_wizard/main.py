@@ -5,6 +5,7 @@ from gi.repository import Gtk, GdkPixbuf
 from pages import *
 from dialogs import *
 
+
 class AppWindow(Gtk.Assistant):
     def __init__(self):
         # Initialize Object properties
@@ -35,27 +36,27 @@ class AppWindow(Gtk.Assistant):
         # Initialize Pages
         self.InitPage(PageIntro())
 
-        ## Deployment options
+        # Deployment options
         self.pd = PageDeployment()
         self.InitPage(self.pd)
 
-        ## Password page
+        # Password page
         self.pwp = PagePassword()
         self.InitPage(self.pwp)
         self.pwp.pw1.connect("changed", self.do_handle_pw1_changed)
         self.pwp.pw2.connect("changed", self.do_handle_pw2_changed)
 
-        ## Page selection
+        # Page selection
         self.ps = PageSelection()
         self.InitPage(self.ps)
-        
+
         self.InitPage(PageSummary())
 
-        ## Progress page
+        # Progress page
         self.pp = PageProgress()
         self.InitPage(self.pp)
 
-        ## Summary page
+        # Summary page
         self.InitPage(PageResult())
 
     def InitWindow(self):
@@ -126,32 +127,41 @@ class AppWindow(Gtk.Assistant):
             self.pwp.pw_result.modify_fg(Gtk.StateType.NORMAL, self.clr_error)
             self.pwp.pw_result.set_label("Das Passwort darf nicht leer sein!")
         else:
-            pw_shell = subprocess.run("/usr/bin/pwscore", input=new_pw1, capture_output=True, text=True)
+            pw_shell = subprocess.run(
+                "/usr/bin/pwscore", input=new_pw1, capture_output=True, text=True)
             self.pw_sufficient = False
 
             if (pw_shell.returncode != 0):
-                self.pwp.pw_result.modify_fg(Gtk.StateType.NORMAL, self.clr_error)
-                self.pwp.pw_result.set_label(pw_shell.stderr.splitlines()[-1])
+                self.pwp.pw_result.modify_fg(
+                    Gtk.StateType.NORMAL, self.clr_error)
+                self.pwp.pw_result.set_label(
+                    pw_shell.stderr.splitlines()[-1].strip())
             else:
                 pw_score = int(pw_shell.stdout)
-                
-                self.pwp.pw_result.modify_fg(Gtk.StateType.NORMAL, self.clr_warning)
-                self.pwp.pw_result.set_label(f"Aktuelle Passwort-Stärke: {pw_score}")
-                self.pwp.pw1.set_progress_fraction(pw_score/100)
-                
+
+                self.pwp.pw_result.modify_fg(
+                    Gtk.StateType.NORMAL, self.clr_warning)
+                self.pwp.pw_result.set_label(
+                    f"Aktuelle Passwort-Stärke: {pw_score}")
+                self.pwp.pw1.set_progress_fraction(pw_score / 100)
+
                 if (pw_score > 90):
-                    self.pwp.pw_result.modify_fg(Gtk.StateType.NORMAL, self.clr_success)
+                    self.pwp.pw_result.modify_fg(
+                        Gtk.StateType.NORMAL, self.clr_success)
                     self.pw_sufficient = True
-        
+
     def do_handle_pw2_changed(self, _widget):
         if self.pw_sufficient:
             if (self.pwp.pw1.get_text() == self.pwp.pw2.get_text()):
-                self.pwp.pw_result.modify_fg(Gtk.StateType.NORMAL, self.clr_success)
+                self.pwp.pw_result.modify_fg(
+                    Gtk.StateType.NORMAL, self.clr_success)
                 self.pwp.pw_result.set_label("Die Passwörter stimmen überein!")
                 self.set_page_complete(self.pwp, True)
             else:
-                self.pwp.pw_result.modify_fg(Gtk.StateType.NORMAL, self.clr_error)
-                self.pwp.pw_result.set_label("Die Passwörter stimmen nicht überein!")
+                self.pwp.pw_result.modify_fg(
+                    Gtk.StateType.NORMAL, self.clr_error)
+                self.pwp.pw_result.set_label(
+                    "Die Passwörter stimmen nicht überein!")
                 self.set_page_complete(self.pwp, False)
 
     def do_handle_prepare(self, assistant, page):
@@ -160,16 +170,16 @@ class AppWindow(Gtk.Assistant):
             assistant.commit()
 
             # TODO: Process User Input
-            ## + Set up firewall
-            ## + New user
-            ## + Change hostname
-            ## + Change password
-            ## + Install packages
-            ## + Remove user 'pi'
-            ## + Remove script + dependencies
-            ## + Deactivate autologin
-            ## + Restore sudo configuration
-            ## + System restore on error
+            # + Set up firewall (SMTP)
+            # + New generated user
+            # + Set and validate password (requires libpwquality-tools)
+            # + Change hostname
+            # + Install selected packages
+            # + Remove user 'pi'
+            # + Remove script + dependencies
+            # + Deactivate autologin
+            # + Restore sudo configuration (revert exception to start wizard as root)
+            # + System restore on error
 
             assistant.set_page_complete(page, True)
 

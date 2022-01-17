@@ -1,7 +1,9 @@
-import string, random
+import string
+import random
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk
+
 
 class PageContainer(Gtk.VBox):
     title: str = "Page Title"
@@ -86,7 +88,8 @@ class PagePassword(PageContainer):
     def PageContent(self):
         # password message
         lbl = Gtk.Label()
-        lbl.set_label(f"Bitte setzen Sie ein sicheres Passwort für Ihren Healbox-Benutzer \"{self.username}\".")
+        lbl.set_label(
+            f"Bitte setzen Sie ein sicheres Passwort für Ihren Healbox-Benutzer \"{self.username}\".")
         lbl.set_margin_bottom(20)
         lbl.set_halign(Gtk.Align.START)
 
@@ -162,7 +165,7 @@ class PageSelection(PageContainer):
         self.cb2 = Gtk.CheckButton.new_with_label(
             "LibreOffice (Office Anwendung)")
         self.cb2.set_active(True)
-        
+
         self.cb3 = Gtk.CheckButton.new_with_label(
             "ScreenShooter (Bildschirmfotos)")
         self.cb3.set_active(True)

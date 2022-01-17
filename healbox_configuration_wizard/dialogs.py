@@ -2,6 +2,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GdkPixbuf
 
+
 class CancelDialog(Gtk.Dialog):
     def __init__(self, parent):
         super().__init__(title="Schließen?", transient_for=parent, flags=0)
