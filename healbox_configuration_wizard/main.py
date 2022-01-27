@@ -1,7 +1,9 @@
 import subprocess
+# from time import sleep
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GdkPixbuf
+# TODO Import atomically
 from pages import *
 from dialogs import *
 
@@ -9,7 +11,7 @@ from dialogs import *
 class AppWindow(Gtk.Assistant):
     def __init__(self):
         # Initialize Object properties
-        ## Colors (Gdk.Color)
+        # Colors (Gdk.Color)
         self.clr_error = Gdk.RGBA()
         self.clr_error.parse("#ff0000")
         self.clr_error = self.clr_error.to_color()
@@ -122,6 +124,7 @@ class AppWindow(Gtk.Assistant):
     def do_handle_pw1_changed(self, _widget):
         new_pw1 = self.pwp.pw1.get_text()
         self.pwp.pw1.set_progress_fraction(0)
+        self.pwp.pw2.set_sensitive(False)
 
         if not new_pw1.strip():
             self.pwp.pw_result.modify_fg(Gtk.StateType.NORMAL, self.clr_error)
@@ -129,7 +132,6 @@ class AppWindow(Gtk.Assistant):
         else:
             pw_shell = subprocess.run(
                 "/usr/bin/pwscore", input=new_pw1, capture_output=True, text=True)
-            self.pw_sufficient = False
 
             if (pw_shell.returncode != 0):
                 self.pwp.pw_result.modify_fg(
@@ -145,24 +147,24 @@ class AppWindow(Gtk.Assistant):
                     f"Aktuelle Passwort-Stärke: {pw_score}")
                 self.pwp.pw1.set_progress_fraction(pw_score / 100)
 
+                # TODO Display minimum password score
                 if (pw_score > 90):
                     self.pwp.pw_result.modify_fg(
                         Gtk.StateType.NORMAL, self.clr_success)
-                    self.pw_sufficient = True
+                    self.pwp.pw2.set_sensitive(True)
 
     def do_handle_pw2_changed(self, _widget):
-        if self.pw_sufficient:
-            if (self.pwp.pw1.get_text() == self.pwp.pw2.get_text()):
-                self.pwp.pw_result.modify_fg(
-                    Gtk.StateType.NORMAL, self.clr_success)
-                self.pwp.pw_result.set_label("Die Passwörter stimmen überein!")
-                self.set_page_complete(self.pwp, True)
-            else:
-                self.pwp.pw_result.modify_fg(
-                    Gtk.StateType.NORMAL, self.clr_error)
-                self.pwp.pw_result.set_label(
-                    "Die Passwörter stimmen nicht überein!")
-                self.set_page_complete(self.pwp, False)
+        if (self.pwp.pw1.get_text() == self.pwp.pw2.get_text()):
+            self.pwp.pw_result.modify_fg(
+                Gtk.StateType.NORMAL, self.clr_success)
+            self.pwp.pw_result.set_label("Die Passwörter stimmen überein!")
+            self.set_page_complete(self.pwp, True)
+        else:
+            self.pwp.pw_result.modify_fg(
+                Gtk.StateType.NORMAL, self.clr_error)
+            self.pwp.pw_result.set_label(
+                "Die Passwörter stimmen nicht überein!")
+            self.set_page_complete(self.pwp, False)
 
     def do_handle_prepare(self, assistant, page):
         if (page.page_type == Gtk.AssistantPageType.PROGRESS):
@@ -180,6 +182,20 @@ class AppWindow(Gtk.Assistant):
             # + Deactivate autologin
             # + Restore sudo configuration (revert exception to start wizard as root)
             # + System restore on error
+
+            cmd_list = [
+                ["apt", "list", "--installed"]
+            ]
+
+            for cmd in cmd_list:
+                p = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+                while p.poll() is None:
+                    std_out = p.stdout.readline()
+                    # sleep(0.05)
+                    self.pp.pb.pulse()
+                    self.pp.txtbuf.insert_at_cursor(
+                        std_out, len(std_out.encode('utf-8')))
 
             assistant.set_page_complete(page, True)
 

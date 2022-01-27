@@ -83,6 +83,9 @@ class PagePassword(PageContainer):
 
     def __init__(self):
         super().__init__()
+        self.pw1 = ""
+        self.pw2 = ""
+        self.pw_result = ""
         self.PageContent()
 
     def PageContent(self):
@@ -98,6 +101,7 @@ class PagePassword(PageContainer):
         # password prompt
         self.pw1 = self.CreatePasswordEntry("Passwort")
         self.pw2 = self.CreatePasswordEntry("Passwort wiederholen")
+        self.pw2.set_sensitive(False)
 
         grid = Gtk.Grid()
         grid.set_column_spacing(10)
@@ -144,6 +148,9 @@ class PageSelection(PageContainer):
 
     def __init__(self):
         super().__init__()
+        self.cb1 = ""
+        self.cb2 = ""
+        self.cb3 = ""
         self.PageContent()
 
     def PageContent(self):
@@ -211,34 +218,46 @@ class PageProgress(PageContainer):
 
     def __init__(self):
         super().__init__()
+        self.pb = ""
+        self.txtbuf = ""
         self.PageContent()
 
     def PageContent(self):
+        # Fill entire page
+        self.set_valign(Gtk.Align.FILL)
+
         # Add Progress Bar
         self.pb = Gtk.ProgressBar()
         self.pb.set_text(
             "Es werden Änderungen an Ihrem System vorgenommen. Bitte warten.")
         self.pb.set_show_text(True)
+        self.pb.set_valign(Gtk.Align.END)
 
         self.add(self.pb)
 
         # Add Expander
-        expander = Gtk.Expander()
-        expander.set_label("Mehr Informationen")
-        expander.set_margin_top(10)
+        exp = Gtk.Expander()
+        exp.set_label("Mehr Informationen")
+        exp.set_margin_top(10)
 
+        # Add scroll window
+        sw = Gtk.ScrolledWindow()
+        # Allow terminal output to grow vertically
+        sw.set_vexpand(True)
+
+        # Add text box
         tv = Gtk.TextView()
         tv.set_editable(False)
         tv.set_input_purpose(Gtk.InputPurpose.FREE_FORM)
         tv.set_monospace(True)
 
-        txtbuf = Gtk.TextBuffer()
-        txtbuf.set_text("Test-Ausgabe")
+        # Create text buffer
+        self.txtbuf = Gtk.TextBuffer()
 
-        tv.set_buffer(txtbuf)
-
-        expander.add(tv)
-        self.add(expander)
+        tv.set_buffer(self.txtbuf)
+        sw.add(tv)
+        exp.add(sw)
+        self.add(exp)
 
 
 class PageResult(PageContainer):
