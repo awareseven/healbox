@@ -1,8 +1,9 @@
 import subprocess
-# from time import sleep
+from threading import Thread
+from time import sleep
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GdkPixbuf
+from gi.repository import Gtk, GdkPixbuf, GLib
 # TODO Import atomically
 from pages import *
 from dialogs import *
@@ -171,33 +172,68 @@ class AppWindow(Gtk.Assistant):
             # Remove Back-Button and clear History
             assistant.commit()
 
-            # TODO: Process User Input
-            # + Set up firewall (SMTP)
-            # + New generated user
-            # + Set and validate password (requires libpwquality-tools)
-            # + Change hostname
-            # + Install selected packages
-            # + Remove user 'pi'
-            # + Remove script + dependencies
-            # + Deactivate autologin
-            # + Restore sudo configuration (revert exception to start wizard as root)
-            # + System restore on error
+            # Process system changes
+            # Docs: https://pygobject.readthedocs.io/en/latest/guide/threading.html
+            Thread(target=self.do_execute, daemon=True).start()
 
-            cmd_list = [
-                ["apt", "list", "--installed"]
-            ]
+    def do_execute(self):
+        # TODO: Process User Input
+        # + Set up firewall (SMTP)
+        # + New generated user
+        # + Set and validate password (requires libpwquality-tools)
+        # + Change hostname
+        # + Install selected packages
+        # + Remove user 'pi'
+        # + Remove script + dependencies
+        # + Deactivate autologin
+        # + Restore sudo configuration (revert exception to start wizard as root)
+        # + System restore on error
 
-            for cmd in cmd_list:
-                p = subprocess.Popen(
-                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
-                while p.poll() is None:
-                    std_out = p.stdout.readline()
-                    # sleep(0.05)
-                    self.pp.pb.pulse()
-                    self.pp.txtbuf.insert_at_cursor(
-                        std_out, len(std_out.encode('utf-8')))
+        def show_pulse(assistant):
+            assistant.pp.pb.pulse()
+            return True
 
-            assistant.set_page_complete(page, True)
+        def init_progress(assistant, index_operation, total_operations):
+            assistant.pp.pb.set_fraction(0)
+            assistant.pp.pb.set_text(
+                f"Es werden Änderungen an Ihrem System vorgenommen. Bitte warten. {index_operation + 1}/{total_operations}")
+
+        def show_progress(assistant, log_output):
+            assistant.pp.txtbuf.insert(
+                assistant.pp.end_iter,
+                log_output, len(log_output.encode("utf-8")))
+
+            assistant.pp.txtview.scroll_to_mark(
+                self.pp.txtmark,
+                0, False, 0, 0)
+
+        pulse_id = GLib.timeout_add(50, show_pulse, self)
+
+        # Initialize command list to be executed by subprocess.Popen()
+        cmd_list = [
+            ["apt", "list", "--installed"],
+            ["cat", "/etc/ssh/ssh_config"],
+        ]
+        cmd_len = len(cmd_list)
+
+        for i in range(cmd_len):
+            GLib.idle_add(init_progress, self, i, cmd_len)
+            p = subprocess.Popen(
+                cmd_list[i], stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+
+            while True:
+                std_out = p.stdout.readline()
+                if std_out == "" and p.poll() is not None:
+                    break
+
+                GLib.idle_add(show_progress, self, std_out)
+                sleep(0.02)
+
+        GLib.source_remove(pulse_id)
+        self.pp.pb.set_fraction(1)
+        self.pp.pb.set_text(
+            "Alle Änderungen sind erfolgreich durchgeführt worden!")
+        self.set_page_complete(self.pp, True)
 
 
 win = AppWindow()

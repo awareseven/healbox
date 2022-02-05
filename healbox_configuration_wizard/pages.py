@@ -7,7 +7,7 @@ from gi.repository import Gtk, Gdk
 
 class PageContainer(Gtk.VBox):
     title: str = "Page Title"
-    page_type: int = Gtk.AssistantPageType.CONTENT
+    page_type: Gtk.AssistantPageType = Gtk.AssistantPageType.CONTENT
     completed: bool = True
 
     def __init__(self):
@@ -219,6 +219,7 @@ class PageProgress(PageContainer):
     def __init__(self):
         super().__init__()
         self.pb = ""
+        self.txtview = ""
         self.txtbuf = ""
         self.PageContent()
 
@@ -228,8 +229,6 @@ class PageProgress(PageContainer):
 
         # Add Progress Bar
         self.pb = Gtk.ProgressBar()
-        self.pb.set_text(
-            "Es werden Änderungen an Ihrem System vorgenommen. Bitte warten.")
         self.pb.set_show_text(True)
         self.pb.set_valign(Gtk.Align.END)
 
@@ -246,16 +245,25 @@ class PageProgress(PageContainer):
         sw.set_vexpand(True)
 
         # Add text box
-        tv = Gtk.TextView()
-        tv.set_editable(False)
-        tv.set_input_purpose(Gtk.InputPurpose.FREE_FORM)
-        tv.set_monospace(True)
+        self.txtview = Gtk.TextView()
+        self.txtview.set_editable(False)
+        self.txtview.set_input_purpose(Gtk.InputPurpose.FREE_FORM)
+        self.txtview.set_monospace(True)
 
         # Create text buffer
         self.txtbuf = Gtk.TextBuffer()
 
-        tv.set_buffer(self.txtbuf)
-        sw.add(tv)
+        # Create text mark
+        self.txtmark = Gtk.TextMark.new(None, False)
+
+        # Get text iterator at the end of the buffer
+        self.end_iter = self.txtbuf.get_end_iter()
+
+        # Add text mark at the end of the buffer
+        self.txtbuf.add_mark(self.txtmark, self.end_iter)
+
+        self.txtview.set_buffer(self.txtbuf)
+        sw.add(self.txtview)
         exp.add(sw)
         self.add(exp)
 
