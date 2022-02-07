@@ -1,78 +1,65 @@
+import shlex
 import subprocess
 from threading import Thread
 from time import sleep
+
+# Import GTK
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GdkPixbuf, GLib
-# TODO Import atomically
-from pages import *
-from dialogs import *
+
+from dialogs import CancelDialog, RebootDialog
+from pages import PageContainer, PageDeployment, PageIntro, PagePassword, PageProgress, PageResult, PageSelection, PageSummary
 
 
 class AppWindow(Gtk.Assistant):
     def __init__(self):
-        # Initialize Object properties
-        # Colors (Gdk.Color)
-        self.clr_error = Gdk.RGBA()
-        self.clr_error.parse("#ff0000")
-        self.clr_error = self.clr_error.to_color()
-
-        self.clr_warning = Gdk.RGBA()
-        self.clr_warning.parse("#ffcc00")
-        self.clr_warning = self.clr_warning.to_color()
-
-        self.clr_success = Gdk.RGBA()
-        self.clr_success.parse("#00cc00")
-        self.clr_success = self.clr_success.to_color()
-
-        self.pw_sufficient = False
-
         # Initialize Gtk.Assistant
         super().__init__()
 
         # Initialize Main Window
-        self.InitWindow()
+        self.__init_window()
 
         # Initialize Header
-        self.InitHeader()
+        self.__init_header()
 
         # Initialize Pages
-        self.InitPage(PageIntro())
+        self.__init_page(PageIntro())
 
         # Deployment options
-        self.pd = PageDeployment()
-        self.InitPage(self.pd)
+        self.page_deployment = PageDeployment()
+        self.__init_page(self.page_deployment)
 
         # Password page
-        self.pwp = PagePassword()
-        self.InitPage(self.pwp)
-        self.pwp.pw1.connect("changed", self.do_handle_pw1_changed)
-        self.pwp.pw2.connect("changed", self.do_handle_pw2_changed)
+        self.page_password = PagePassword()
+        self.page_password.connect(
+            "pw_sufficient", self.__do_handle_pw_sufficient)
+        self.__init_page(self.page_password)
 
         # Page selection
-        self.ps = PageSelection()
-        self.InitPage(self.ps)
+        self.page_selection = PageSelection()
+        self.__init_page(self.page_selection)
 
-        self.InitPage(PageSummary())
+        self.__init_page(PageSummary())
 
         # Progress page
-        self.pp = PageProgress()
-        self.InitPage(self.pp)
+        self.page_progress = PageProgress()
+        self.__init_page(self.page_progress)
 
         # Summary page
-        self.InitPage(PageResult())
+        self.__init_page(PageResult())
 
-    def InitWindow(self):
+    def __init_window(self):
         self.set_icon_from_file("healbox.svg")
         self.set_default_size(600, 350)
         self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
 
-        self.connect("cancel", self.do_handle_cancel)
-        self.connect("close", self.do_handle_close)
-        self.connect("prepare", self.do_handle_prepare)
+        self.connect("cancel", self.__do_handle_cancel)
+        self.connect("close", self.__do_handle_close)
+        self.connect("prepare", self.__do_handle_prepare)
 
-    def InitHeader(self):
+    def __init_header(self):
         hb = Gtk.HeaderBar()
         hb.set_has_subtitle(True)
         hb.set_show_close_button(True)
@@ -91,13 +78,13 @@ class AppWindow(Gtk.Assistant):
         hb.add(hb_icon)
         self.set_titlebar(hb)
 
-    def InitPage(self, page: PageContainer):
+    def __init_page(self, page: PageContainer):
         self.append_page(page)
         self.set_page_title(page, page.title)
         self.set_page_type(page, page.page_type)
         self.set_page_complete(page, page.completed)
 
-    def do_handle_cancel(self, _widget):
+    def __do_handle_cancel(self, _):
         dialog = CancelDialog(self)
 
         response = dialog.run()
@@ -105,11 +92,10 @@ class AppWindow(Gtk.Assistant):
         if response == Gtk.ResponseType.OK:
             dialog.destroy()
             self.destroy()
-            Gtk.main_quit
         elif response == Gtk.ResponseType.CANCEL:
             dialog.destroy()
 
-    def do_handle_close(self, _widget):
+    def __do_handle_close(self, _):
         self.destroy()
 
         dialog = RebootDialog(self)
@@ -122,61 +108,31 @@ class AppWindow(Gtk.Assistant):
 
         dialog.destroy()
 
-    def do_handle_pw1_changed(self, _widget):
-        new_pw1 = self.pwp.pw1.get_text()
-        self.pwp.pw1.set_progress_fraction(0)
-        self.pwp.pw2.set_sensitive(False)
-
-        if not new_pw1.strip():
-            self.pwp.pw_result.modify_fg(Gtk.StateType.NORMAL, self.clr_error)
-            self.pwp.pw_result.set_label("Das Passwort darf nicht leer sein!")
-        else:
-            pw_shell = subprocess.run(
-                "/usr/bin/pwscore", input=new_pw1, capture_output=True, text=True)
-
-            if (pw_shell.returncode != 0):
-                self.pwp.pw_result.modify_fg(
-                    Gtk.StateType.NORMAL, self.clr_error)
-                self.pwp.pw_result.set_label(
-                    pw_shell.stderr.splitlines()[-1].strip())
-            else:
-                pw_score = int(pw_shell.stdout)
-
-                self.pwp.pw_result.modify_fg(
-                    Gtk.StateType.NORMAL, self.clr_warning)
-                self.pwp.pw_result.set_label(
-                    f"Aktuelle Passwort-Stärke: {pw_score}")
-                self.pwp.pw1.set_progress_fraction(pw_score / 100)
-
-                # TODO Display minimum password score
-                if (pw_score > 90):
-                    self.pwp.pw_result.modify_fg(
-                        Gtk.StateType.NORMAL, self.clr_success)
-                    self.pwp.pw2.set_sensitive(True)
-
-    def do_handle_pw2_changed(self, _widget):
-        if (self.pwp.pw1.get_text() == self.pwp.pw2.get_text()):
-            self.pwp.pw_result.modify_fg(
-                Gtk.StateType.NORMAL, self.clr_success)
-            self.pwp.pw_result.set_label("Die Passwörter stimmen überein!")
-            self.set_page_complete(self.pwp, True)
-        else:
-            self.pwp.pw_result.modify_fg(
-                Gtk.StateType.NORMAL, self.clr_error)
-            self.pwp.pw_result.set_label(
-                "Die Passwörter stimmen nicht überein!")
-            self.set_page_complete(self.pwp, False)
-
-    def do_handle_prepare(self, assistant, page):
+    def __do_handle_prepare(self, _, page: PageContainer):
         if (page.page_type == Gtk.AssistantPageType.PROGRESS):
             # Remove Back-Button and clear History
-            assistant.commit()
+            self.commit()
+
+            # TODO: create appropriate command list
+            print(self.page_deployment.deployment_mode)
+            print(self.page_selection.get_package_list())
+            print(self.page_password.password)
+
+            # Initialize command list to be executed by subprocess.Popen()
+            cmd_list = [
+                "apt list --installed",
+                "cat /etc/ssh/ssh_config",
+            ]
 
             # Process system changes
             # Docs: https://pygobject.readthedocs.io/en/latest/guide/threading.html
-            Thread(target=self.do_execute, daemon=True).start()
+            Thread(target=self.__process_input,
+                   daemon=True, args=(cmd_list,)).start()
 
-    def do_execute(self):
+    def __do_handle_pw_sufficient(self, page: PageContainer, pw_sufficient: bool):
+        self.set_page_complete(page, pw_sufficient)
+
+    def __process_input(self, cmd_list):
         # TODO: Process User Input
         # + Set up firewall (SMTP)
         # + New generated user
@@ -189,54 +145,64 @@ class AppWindow(Gtk.Assistant):
         # + Restore sudo configuration (revert exception to start wizard as root)
         # + System restore on error
 
-        def show_pulse(assistant):
-            assistant.pp.pb.pulse()
+        def show_pulse() -> bool:
+            self.page_progress.pb.pulse()
             return True
 
-        def init_progress(assistant, index_operation, total_operations):
-            assistant.pp.pb.set_fraction(0)
-            assistant.pp.pb.set_text(
-                f"Es werden Änderungen an Ihrem System vorgenommen. Bitte warten. {index_operation + 1}/{total_operations}")
+        def init_progress(cmd_index: int, cmd_list: list):
+            cmd_string = f"Command output [{cmd_list[cmd_index]}]:\n"
+            self.page_progress.pb.set_fraction(0)
+            self.page_progress.pb.set_text(
+                f"Es werden Änderungen an Ihrem System vorgenommen. Bitte warten. {cmd_index + 1}/{len(cmd_list)}")
+            self.page_progress.txtbuf.insert(
+                self.page_progress.end_iter,
+                cmd_string,
+                len(cmd_string.encode("utf-8"))
+            )
 
-        def show_progress(assistant, log_output):
-            assistant.pp.txtbuf.insert(
-                assistant.pp.end_iter,
-                log_output, len(log_output.encode("utf-8")))
+        def write_progress_log(log_output: str):
+            self.page_progress.txtbuf.insert(
+                self.page_progress.end_iter,
+                log_output,
+                len(log_output.encode("utf-8"))
+            )
 
-            assistant.pp.txtview.scroll_to_mark(
-                self.pp.txtmark,
-                0, False, 0, 0)
+            self.page_progress.txtview.scroll_to_mark(
+                self.page_progress.txtmark, 0, False, 0, 0)
 
-        pulse_id = GLib.timeout_add(50, show_pulse, self)
+        pulse_id = GLib.timeout_add(100, show_pulse)
 
-        # Initialize command list to be executed by subprocess.Popen()
-        cmd_list = [
-            ["apt", "list", "--installed"],
-            ["cat", "/etc/ssh/ssh_config"],
-        ]
-        cmd_len = len(cmd_list)
-
-        for i in range(cmd_len):
-            GLib.idle_add(init_progress, self, i, cmd_len)
+        for i in range(len(cmd_list)):
+            GLib.idle_add(init_progress, i, cmd_list)
             p = subprocess.Popen(
-                cmd_list[i], stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+                shlex.split(cmd_list[i]),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                encoding="utf-8"
+            )
 
             while True:
                 std_out = p.stdout.readline()
                 if std_out == "" and p.poll() is not None:
+                    GLib.idle_add(write_progress_log, "\n")
                     break
 
-                GLib.idle_add(show_progress, self, std_out)
+                GLib.idle_add(write_progress_log, std_out)
                 sleep(0.02)
 
         GLib.source_remove(pulse_id)
-        self.pp.pb.set_fraction(1)
-        self.pp.pb.set_text(
+        self.page_progress.pb.set_fraction(1)
+        self.page_progress.pb.set_text(
             "Alle Änderungen sind erfolgreich durchgeführt worden!")
-        self.set_page_complete(self.pp, True)
+        self.set_page_complete(self.page_progress, True)
 
 
-win = AppWindow()
-win.connect("destroy", Gtk.main_quit)
-win.show_all()
-Gtk.main()
+def main():
+    win = AppWindow()
+    win.connect("destroy", Gtk.main_quit)
+    win.show_all()
+    Gtk.main()
+
+
+if __name__ == '__main__':
+    main()

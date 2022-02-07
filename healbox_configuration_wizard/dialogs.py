@@ -22,7 +22,10 @@ class RebootDialog(Gtk.Dialog):
     def __init__(self, parent):
         super().__init__(title="Bitte Neustarten", transient_for=parent, flags=0)
         self.set_default_size(100, 100)
+        self.__content()
+        self.show_all()
 
+    def __content(self):
         self.add_button("Später Neustarten", Gtk.ResponseType.CANCEL)
         self.add_button("Jetzt Neustarten", Gtk.ResponseType.OK)
         self.set_default_response(Gtk.ResponseType.OK)
@@ -55,4 +58,3 @@ class RebootDialog(Gtk.Dialog):
         container.add(lbl2)
 
         self.get_content_area().add(container)
-        self.show_all()

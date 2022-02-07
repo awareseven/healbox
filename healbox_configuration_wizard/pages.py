@@ -1,8 +1,11 @@
-import string
+from enum import Enum
 import random
+import string
+import subprocess
+
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk, Gdk, GObject
 
 
 class PageContainer(Gtk.VBox):
@@ -14,13 +17,14 @@ class PageContainer(Gtk.VBox):
         super().__init__()
         self.set_valign(Gtk.Align.CENTER)
 
-    def rand_string(strlen: int):
+    @staticmethod
+    def __rand_string(strlen: int) -> str:
         return ''.join(random.choice(
             string.ascii_letters + string.digits
         ) for _ in range(strlen))
 
-    username: str = "hb-" + rand_string(3)
-    hostname: str = "healbox-" + rand_string(6)
+    username: str = "hb-" + __rand_string(3)
+    hostname: str = "healbox-" + __rand_string(6)
 
 
 class PageIntro(PageContainer):
@@ -29,9 +33,9 @@ class PageIntro(PageContainer):
 
     def __init__(self):
         super().__init__()
-        self.PageContent()
+        self.__content()
 
-    def PageContent(self):
+    def __content(self):
         lbl = Gtk.Label()
         lbl.set_justify(Gtk.Justification.LEFT)
         lbl.set_label("""
@@ -46,11 +50,17 @@ Wenn Sie bereit sind, drücken Sie auf "Weiter".
 class PageDeployment(PageContainer):
     title = "Einsatzzweck"
 
+    class DeploymentMode(Enum):
+        READ_ONLY = 1
+        READ_SEND = 2
+        PROXY = 3
+
     def __init__(self):
         super().__init__()
-        self.PageContent()
+        self.deployment_mode = self.DeploymentMode.READ_ONLY
+        self.__content()
 
-    def PageContent(self):
+    def __content(self):
         # Create Label
         lbl = Gtk.Label()
         lbl.set_justify(Gtk.Justification.LEFT)
@@ -63,11 +73,17 @@ class PageDeployment(PageContainer):
         # Create Radio Buttons
         rb1 = Gtk.RadioButton.new_with_label(
             None, "Ich möchte E-Mails lesen (standard)")
+        rb1.connect("toggled", self.__set_deployment_mode,
+                    self.DeploymentMode.READ_ONLY)
         rb2 = Gtk.RadioButton.new_with_label_from_widget(
             rb1, "Ich möchte E-Mails lesen und versenden")
+        rb2.connect("toggled", self.__set_deployment_mode,
+                    self.DeploymentMode.READ_SEND)
         rb3 = Gtk.RadioButton.new_with_label_from_widget(
             rb1, "Ich möchte die Healbox als E-Mail-Proxy verwenden (experimentell)")
         rb3.set_sensitive(False)
+        rb3.connect("toggled", self.__set_deployment_mode,
+                    self.DeploymentMode.PROXY)
 
         container = Gtk.VBox()
         container.add(rb1)
@@ -76,6 +92,9 @@ class PageDeployment(PageContainer):
 
         self.add(container)
 
+    def __set_deployment_mode(self, _, deployment_mode: DeploymentMode):
+        self.deployment_mode = deployment_mode
+
 
 class PagePassword(PageContainer):
     title = "Passwort für neuen Benutzer"
@@ -83,12 +102,31 @@ class PagePassword(PageContainer):
 
     def __init__(self):
         super().__init__()
+        # Initialize Colors (Gdk.Color)
+        self.clr_error = Gdk.RGBA()
+        self.clr_error.parse("#ff0000")
+        self.clr_error = self.clr_error.to_color()
+
+        self.clr_warning = Gdk.RGBA()
+        self.clr_warning.parse("#ffcc00")
+        self.clr_warning = self.clr_warning.to_color()
+
+        self.clr_success = Gdk.RGBA()
+        self.clr_success.parse("#00cc00")
+        self.clr_success = self.clr_success.to_color()
+
+        GObject.signal_new("pw_sufficient", self,
+                           GObject.SignalFlags.RUN_LAST, None, (bool,))
+
         self.pw1 = ""
         self.pw2 = ""
         self.pw_result = ""
-        self.PageContent()
 
-    def PageContent(self):
+        self.password: str = ""
+
+        self.__content()
+
+    def __content(self):
         # password message
         lbl = Gtk.Label()
         lbl.set_label(
@@ -99,8 +137,11 @@ class PagePassword(PageContainer):
         self.add(lbl)
 
         # password prompt
-        self.pw1 = self.CreatePasswordEntry("Passwort")
-        self.pw2 = self.CreatePasswordEntry("Passwort wiederholen")
+        self.pw1 = self.__create_password_entry("Passwort")
+        self.pw1.connect("changed", self.__do_handle_pw1_changed)
+        self.pw2 = self.__create_password_entry("Passwort wiederholen")
+        self.pw2.connect("changed", self.__do_handle_pw2_changed)
+
         self.pw2.set_sensitive(False)
 
         grid = Gtk.Grid()
@@ -133,7 +174,8 @@ class PagePassword(PageContainer):
 
         self.add(grid)
 
-    def CreatePasswordEntry(self, placeholder: str):
+    @staticmethod
+    def __create_password_entry(placeholder: str) -> Gtk.Entry:
         txt = Gtk.Entry()
         txt.set_placeholder_text(placeholder)
         txt.set_visibility(False)
@@ -142,18 +184,64 @@ class PagePassword(PageContainer):
         txt.set_hexpand(True)
         return txt
 
+    def __do_handle_pw1_changed(self, _):
+        self.password = self.pw1.get_text()
+        self.pw1.set_progress_fraction(0)
+        self.pw2.set_sensitive(False)
+
+        if not self.password.strip():
+            self.pw_result.modify_fg(Gtk.StateType.NORMAL, self.clr_error)
+            self.pw_result.set_label("Das Passwort darf nicht leer sein!")
+        else:
+            pw_shell = subprocess.run(
+                "/usr/bin/pwscore", input=self.password, capture_output=True, text=True)
+
+            if (pw_shell.returncode != 0):
+                self.pw_result.modify_fg(
+                    Gtk.StateType.NORMAL, self.clr_error)
+                self.pw_result.set_label(
+                    pw_shell.stderr.splitlines()[-1].strip())
+            else:
+                pw_score = int(pw_shell.stdout)
+
+                self.pw_result.modify_fg(
+                    Gtk.StateType.NORMAL, self.clr_warning)
+                self.pw_result.set_label(
+                    f"Aktuelle Passwort-Stärke: {pw_score}")
+                self.pw1.set_progress_fraction(pw_score / 100)
+
+                # TODO Display minimum password score
+                if (pw_score > 90):
+                    self.pw_result.modify_fg(
+                        Gtk.StateType.NORMAL, self.clr_success)
+                    self.pw2.set_sensitive(True)
+
+    def __do_handle_pw2_changed(self, _):
+        if (self.pw1.get_text() == self.pw2.get_text()):
+            self.pw_result.modify_fg(
+                Gtk.StateType.NORMAL, self.clr_success)
+            self.pw_result.set_label("Die Passwörter stimmen überein!")
+            self.__emit_pw_sufficient(True)
+        else:
+            self.pw_result.modify_fg(
+                Gtk.StateType.NORMAL, self.clr_error)
+            self.pw_result.set_label(
+                "Die Passwörter stimmen nicht überein!")
+            self.__emit_pw_sufficient(False)
+
+    def __emit_pw_sufficient(self, sufficient: bool):
+        self.emit("pw_sufficient", sufficient)
+
 
 class PageSelection(PageContainer):
     title = "Programme auswählen"
 
     def __init__(self):
         super().__init__()
-        self.cb1 = ""
-        self.cb2 = ""
-        self.cb3 = ""
-        self.PageContent()
+        self.user_selection = {}
+        self.__content()
 
-    def PageContent(self):
+    def __content(self):
         # Create Label
         lbl = Gtk.Label()
         lbl.set_justify(Gtk.Justification.LEFT)
@@ -165,24 +253,38 @@ class PageSelection(PageContainer):
         self.add(lbl)
 
         # Create Check Boxes
-        self.cb1 = Gtk.CheckButton.new_with_label(
+        cb1 = Gtk.CheckButton.new_with_label(
             "Thunderbird (E-Mail Client)")
-        self.cb1.set_active(True)
+        cb1.connect("toggled", self.__set_user_selection, "cb1", "thunderbird")
+        cb1.set_active(True)
 
-        self.cb2 = Gtk.CheckButton.new_with_label(
+        cb2 = Gtk.CheckButton.new_with_label(
             "LibreOffice (Office Anwendung)")
-        self.cb2.set_active(True)
+        cb2.connect("toggled", self.__set_user_selection,
+                    "cb2", "libreoffice-writer")
+        cb2.set_active(True)
 
-        self.cb3 = Gtk.CheckButton.new_with_label(
+        cb3 = Gtk.CheckButton.new_with_label(
             "ScreenShooter (Bildschirmfotos)")
-        self.cb3.set_active(True)
+        cb3.connect("toggled", self.__set_user_selection,
+                    "cb3", "screenshooter")
+        cb3.set_active(True)
 
         container = Gtk.VBox()
-        container.add(self.cb1)
-        container.add(self.cb2)
-        container.add(self.cb3)
+        container.add(cb1)
+        container.add(cb2)
+        container.add(cb3)
 
         self.add(container)
+
+    def __set_user_selection(self, widget, key: str, value: str):
+        if widget.get_active():
+            self.user_selection[key] = value
+        elif key in self.user_selection.keys():
+            self.user_selection.pop(key)
+
+    def get_package_list(self) -> str:
+        return " ".join(self.user_selection.values())
 
 
 class PageSummary(PageContainer):
@@ -191,9 +293,9 @@ class PageSummary(PageContainer):
 
     def __init__(self):
         super().__init__()
-        self.PageContent()
+        self.__content()
 
-    def PageContent(self):
+    def __content(self):
         lbl = Gtk.Label()
         lbl.set_justify(Gtk.Justification.LEFT)
         lbl.set_label("""
@@ -221,9 +323,9 @@ class PageProgress(PageContainer):
         self.pb = ""
         self.txtview = ""
         self.txtbuf = ""
-        self.PageContent()
+        self.__content()
 
-    def PageContent(self):
+    def __content(self):
         # Fill entire page
         self.set_valign(Gtk.Align.FILL)
 
@@ -274,9 +376,9 @@ class PageResult(PageContainer):
 
     def __init__(self):
         super().__init__()
-        self.PageContent()
+        self.__content()
 
-    def PageContent(self):
+    def __content(self):
         lbl = Gtk.Label()
         lbl.set_justify(Gtk.Justification.LEFT)
         lbl.set_label(f"""
