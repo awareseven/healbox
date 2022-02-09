@@ -1,15 +1,22 @@
-import shlex
-import subprocess
 from threading import Thread
-from time import sleep
 
 # Import GTK
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GdkPixbuf, GLib
+from gi.repository import Gtk, GdkPixbuf
 
-from dialogs import CancelDialog, RebootDialog
-from pages import PageContainer, PageDeployment, PageIntro, PagePassword, PageProgress, PageResult, PageSelection, PageSummary
+from lib.dialogs import CancelDialog
+from lib.dialogs import RebootDialog
+from lib.pages import PageContainer
+from lib.pages import PageDeployment
+from lib.pages import PageIntro
+from lib.pages import PagePassword
+from lib.pages import PageProgress
+from lib.pages import PageResult
+from lib.pages import PageSelection
+from lib.pages import PageSummary
+
+HEALBOX_LOGO = "assets/healbox.svg"
 
 
 class AppWindow(Gtk.Assistant):
@@ -33,7 +40,7 @@ class AppWindow(Gtk.Assistant):
         # Password page
         self.page_password = PagePassword()
         self.page_password.connect(
-            "pw_sufficient", self.__do_handle_pw_sufficient)
+            "page_completed", self.__do_handle_page_completed)
         self.__init_page(self.page_password)
 
         # Page selection
@@ -44,13 +51,15 @@ class AppWindow(Gtk.Assistant):
 
         # Progress page
         self.page_progress = PageProgress()
+        self.page_progress.connect(
+            "page_completed", self.__do_handle_page_completed)
         self.__init_page(self.page_progress)
 
         # Summary page
         self.__init_page(PageResult())
 
     def __init_window(self):
-        self.set_icon_from_file("healbox.svg")
+        self.set_icon_from_file(HEALBOX_LOGO)
         self.set_default_size(600, 350)
         self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
@@ -65,7 +74,7 @@ class AppWindow(Gtk.Assistant):
         hb.set_show_close_button(True)
         hb.set_subtitle("Healbox Configuration Wizard")
 
-        logo_pixbuf = GdkPixbuf.Pixbuf.new_from_file('healbox.svg')
+        logo_pixbuf = GdkPixbuf.Pixbuf.new_from_file(HEALBOX_LOGO)
         logo_pixbuf = logo_pixbuf.scale_simple(
             40, 40, GdkPixbuf.InterpType.BILINEAR)
 
@@ -83,6 +92,7 @@ class AppWindow(Gtk.Assistant):
         self.set_page_title(page, page.title)
         self.set_page_type(page, page.page_type)
         self.set_page_complete(page, page.completed)
+        page.connect("page_exception", self.__do_handle_page_exception)
 
     def __do_handle_cancel(self, _):
         dialog = CancelDialog(self)
@@ -98,7 +108,7 @@ class AppWindow(Gtk.Assistant):
     def __do_handle_close(self, _):
         self.destroy()
 
-        dialog = RebootDialog(self)
+        dialog = RebootDialog(self, HEALBOX_LOGO)
         response = dialog.run()
 
         if response == Gtk.ResponseType.OK:
@@ -117,6 +127,8 @@ class AppWindow(Gtk.Assistant):
             print(self.page_deployment.deployment_mode)
             print(self.page_selection.get_package_list())
             print(self.page_password.password)
+            print(PageContainer.username)
+            print(PageContainer.hostname)
 
             # Initialize command list to be executed by subprocess.Popen()
             cmd_list = [
@@ -126,75 +138,15 @@ class AppWindow(Gtk.Assistant):
 
             # Process system changes
             # Docs: https://pygobject.readthedocs.io/en/latest/guide/threading.html
-            Thread(target=self.__process_input,
+            Thread(target=self.page_progress.process_input,
                    daemon=True, args=(cmd_list,)).start()
 
-    def __do_handle_pw_sufficient(self, page: PageContainer, pw_sufficient: bool):
-        self.set_page_complete(page, pw_sufficient)
+    def __do_handle_page_completed(self, page: PageContainer, completed: bool):
+        self.set_page_complete(page, completed)
 
-    def __process_input(self, cmd_list):
-        # TODO: Process User Input
-        # + Set up firewall (SMTP)
-        # + New generated user
-        # + Set and validate password (requires libpwquality-tools)
-        # + Change hostname
-        # + Install selected packages
-        # + Remove user 'pi'
-        # + Remove script + dependencies
-        # + Deactivate autologin
-        # + Restore sudo configuration (revert exception to start wizard as root)
-        # + System restore on error
-
-        def show_pulse() -> bool:
-            self.page_progress.pb.pulse()
-            return True
-
-        def init_progress(cmd_index: int, cmd_list: list):
-            cmd_string = f"Command output [{cmd_list[cmd_index]}]:\n"
-            self.page_progress.pb.set_fraction(0)
-            self.page_progress.pb.set_text(
-                f"Es werden Änderungen an Ihrem System vorgenommen. Bitte warten. {cmd_index + 1}/{len(cmd_list)}")
-            self.page_progress.txtbuf.insert(
-                self.page_progress.end_iter,
-                cmd_string,
-                len(cmd_string.encode("utf-8"))
-            )
-
-        def write_progress_log(log_output: str):
-            self.page_progress.txtbuf.insert(
-                self.page_progress.end_iter,
-                log_output,
-                len(log_output.encode("utf-8"))
-            )
-
-            self.page_progress.txtview.scroll_to_mark(
-                self.page_progress.txtmark, 0, False, 0, 0)
-
-        pulse_id = GLib.timeout_add(100, show_pulse)
-
-        for i in range(len(cmd_list)):
-            GLib.idle_add(init_progress, i, cmd_list)
-            p = subprocess.Popen(
-                shlex.split(cmd_list[i]),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                encoding="utf-8"
-            )
-
-            while True:
-                std_out = p.stdout.readline()
-                if std_out == "" and p.poll() is not None:
-                    GLib.idle_add(write_progress_log, "\n")
-                    break
-
-                GLib.idle_add(write_progress_log, std_out)
-                sleep(0.02)
-
-        GLib.source_remove(pulse_id)
-        self.page_progress.pb.set_fraction(1)
-        self.page_progress.pb.set_text(
-            "Alle Änderungen sind erfolgreich durchgeführt worden!")
-        self.set_page_complete(self.page_progress, True)
+    def __do_handle_page_exception(self, widget, exception: Exception):
+        # TODO: Error dialog
+        print(widget, exception)
 
 
 def main():

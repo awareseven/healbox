@@ -3,34 +3,19 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GdkPixbuf
 
 
-class CancelDialog(Gtk.MessageDialog):
-    def __init__(self, parent):
-        super().__init__(
-            title="Schließen?",
-            transient_for=parent,
-            flags=0,
-            message_type=Gtk.MessageType.WARNING,
-            buttons=Gtk.ButtonsType.OK_CANCEL,
-            text="Das Fenster wird nun geschlossen."
-        )
-
-        self.format_secondary_text("Möchten Sie fortfahren?")
-        self.show_all()
-
-
 class RebootDialog(Gtk.Dialog):
-    def __init__(self, parent):
+    def __init__(self, parent, image_path: str):
         super().__init__(title="Bitte Neustarten", transient_for=parent, flags=0)
         self.set_default_size(100, 100)
-        self.__content()
+        self.__content(image_path)
         self.show_all()
 
-    def __content(self):
+    def __content(self, image_path):
         self.add_button("Später Neustarten", Gtk.ResponseType.CANCEL)
         self.add_button("Jetzt Neustarten", Gtk.ResponseType.OK)
         self.set_default_response(Gtk.ResponseType.OK)
 
-        logo_pixbuf = GdkPixbuf.Pixbuf.new_from_file('healbox.svg')
+        logo_pixbuf = GdkPixbuf.Pixbuf.new_from_file(image_path)
         logo_pixbuf = logo_pixbuf.scale_simple(
             80, 80, GdkPixbuf.InterpType.BILINEAR)
 
