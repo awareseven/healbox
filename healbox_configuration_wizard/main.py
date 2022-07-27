@@ -5,6 +5,8 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GdkPixbuf
 
+from lib import ApplicationState
+from lib import ProcessExecutor
 from lib.dialogs import CancelDialog
 from lib.dialogs import RebootDialog
 from lib.pages import PageContainer
@@ -23,6 +25,9 @@ class AppWindow(Gtk.Assistant):
     def __init__(self):
         # Initialize Gtk.Assistant
         super().__init__()
+
+        # Initialize Application State
+        self.application_state = ApplicationState.get_instance()
 
         # Initialize Main Window
         self.__init_window()
@@ -98,48 +103,29 @@ class AppWindow(Gtk.Assistant):
         dialog = CancelDialog(self)
 
         response = dialog.run()
+        dialog.destroy()
 
         if response == Gtk.ResponseType.OK:
-            dialog.destroy()
             self.destroy()
-        elif response == Gtk.ResponseType.CANCEL:
-            dialog.destroy()
 
     def __do_handle_close(self, _):
         self.destroy()
 
         dialog = RebootDialog(self, HEALBOX_LOGO)
         response = dialog.run()
+        dialog.destroy()
 
         if response == Gtk.ResponseType.OK:
-            print("Reboot")
-        elif response == Gtk.ResponseType.CANCEL:
-            print("Do not reboot")
-
-        dialog.destroy()
+            ProcessExecutor.reboot()
 
     def __do_handle_prepare(self, _, page: PageContainer):
         if (page.page_type == Gtk.AssistantPageType.PROGRESS):
             # Remove Back-Button and clear History
             self.commit()
 
-            # TODO: create appropriate command list
-            print(self.page_deployment.deployment_mode)
-            print(self.page_selection.get_package_list())
-            print(self.page_password.password)
-            print(PageContainer.username)
-            print(PageContainer.hostname)
-
-            # Initialize command list to be executed by subprocess.Popen()
-            cmd_list = [
-                "apt list --installed",
-                "cat /etc/ssh/ssh_config",
-            ]
-
             # Process system changes
             # Docs: https://pygobject.readthedocs.io/en/latest/guide/threading.html
-            Thread(target=self.page_progress.process_input,
-                   daemon=True, args=(cmd_list,)).start()
+            Thread(target=self.page_progress.process_input, daemon=True).start()
 
     def __do_handle_page_completed(self, page: PageContainer, completed: bool):
         self.set_page_complete(page, completed)
@@ -154,7 +140,3 @@ def main():
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()
-
-
-if __name__ == '__main__':
-    main()

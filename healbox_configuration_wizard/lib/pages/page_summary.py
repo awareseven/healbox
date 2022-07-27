@@ -1,5 +1,3 @@
-import gi
-gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
 from . import PageContainer
@@ -20,10 +18,10 @@ class PageSummary(PageContainer):
 Folgende Änderungen werden am System vorgenommen:
 
 Unnötige Dienste werden deaktiviert
-Nicht notwendige Anwendungen entfernt
-E-Mail & Office Anwendungen Installiert
-Sicherheitseinstellungen angewendet
-Berechtigungen angepasst
+Nicht notwendige Anwendungen werden entfernt
+E-Mail & Office Anwendungen werden installiert
+Sicherheitseinstellungen werden angewendet
+Berechtigungen werden angepasst
 """)
 
         # TODO: Display system changes

@@ -1,7 +1,5 @@
 import subprocess
 
-import gi
-gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
 from . import PageContainer
@@ -16,14 +14,13 @@ class PagePassword(PageContainer):
         self.__pw1: str = ""
         self.__pw2: str = ""
         self.__pw_result: str = ""
-        self.password: str = ""
         self.__content()
 
     def __content(self):
         # password message
         lbl = Gtk.Label()
         lbl.set_label(
-            f"Bitte setzen Sie ein sicheres Passwort für Ihren Healbox-Benutzer \"{self.username}\".")
+            f"Bitte setzen Sie ein sicheres Passwort für Ihren Healbox-Benutzer \"{self._application_state.username}\".")
         lbl.set_margin_bottom(20)
         lbl.set_halign(Gtk.Align.START)
 
@@ -86,17 +83,17 @@ class PagePassword(PageContainer):
         widget.set_visibility(False)
 
     def __do_handle_pw1_changed(self, _):
-        self.password = self.__pw1.get_text()
+        password = self.__pw1.get_text()
         self.__pw1.set_progress_fraction(0)
         self.__pw2.set_sensitive(False)
 
-        if not self.password.strip():
+        if not password.strip():
             self.__pw_result.modify_fg(Gtk.StateType.NORMAL, self._color_error)
             self.__pw_result.set_label("Das Passwort darf nicht leer sein!")
         else:
             pw_shell = subprocess.run(
                 "/usr/bin/pwscore",
-                input=self.password,
+                input=password,
                 capture_output=True,
                 text=True
             )
@@ -117,6 +114,7 @@ class PagePassword(PageContainer):
 
                 # TODO Display minimum password score
                 if (pw_score > 90):
+                    self._application_state.password = password
                     self.__pw_result.modify_fg(
                         Gtk.StateType.NORMAL, self._color_success)
                     self.__pw2.set_sensitive(True)

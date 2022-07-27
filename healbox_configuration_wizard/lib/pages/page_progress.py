@@ -1,11 +1,8 @@
-import shlex
 import subprocess
-from time import sleep
 
-import gi
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib
+from gi.repository import GLib, Gtk
 
+from .. import ProcessExecutor
 from . import PageContainer
 
 
@@ -21,6 +18,10 @@ class PageProgress(PageContainer):
         self.__txtbuf = ""
         self.__txtmark = ""
         self.__end_iter = ""
+
+        self.cmd_max = 0
+        self.cmd_step = 0
+
         self.__content()
 
     def __content(self):
@@ -67,65 +68,45 @@ class PageProgress(PageContainer):
         exp.add(sw)
         self.add(exp)
 
-    def process_input(self, cmd_list):
-        # TODO: Process User Input
-        # + Set up firewall (SMTP)
-        # + New generated user
-        # + Set and validate password (requires libpwquality-tools)
-        # + Change hostname
-        # + Install selected packages
-        # + Remove user 'pi'
-        # + Remove script + dependencies
-        # + Deactivate autologin
-        # + Restore sudo configuration (revert exception to start wizard as root)
-        # + System restore on error
+    def __show_pulse(self) -> bool:
+        self.__pb.pulse()
+        return True
 
-        def show_pulse() -> bool:
-            self.__pb.pulse()
-            return True
+    def __init_progress(self):
+        self.__pb.set_fraction(0)
+        self.__pb.set_text(
+            f"Es werden Änderungen an Ihrem System vorgenommen. Bitte warten. {self.cmd_step}/{self.cmd_max}")
 
-        def init_progress(cmd_index: int, cmd_list: list):
-            cmd_string = f"Command output [{cmd_list[cmd_index]}]:\n"
-            self.__pb.set_fraction(0)
-            self.__pb.set_text(
-                f"Es werden Änderungen an Ihrem System vorgenommen. Bitte warten. {cmd_index + 1}/{len(cmd_list)}")
-            self.__txtbuf.insert(
-                self.__end_iter,
-                cmd_string,
-                len(cmd_string.encode("utf-8"))
-            )
+    def __write_progress(self, cmd_out):
+        self.__txtbuf.insert(
+            self.__end_iter,
+            cmd_out,
+            len(cmd_out.encode("utf-8"))
+        )
+        self.__txtview.scroll_to_mark(
+            self.__txtmark, 0, False, 0, 0)
 
-        def write_progress_log(log_output: str):
-            self.__txtbuf.insert(
-                self.__end_iter,
-                log_output,
-                len(log_output.encode("utf-8"))
-            )
+    def __on_cmd_max(self, _, cmd_max: int):
+        self.cmd_max = cmd_max
 
-            self.__txtview.scroll_to_mark(
-                self.__txtmark, 0, False, 0, 0)
+    def __on_cmd_step(self, _, cmd_step: int):
+        self.cmd_step = cmd_step
+        GLib.idle_add(self.__init_progress)
 
-        pulse_id = GLib.timeout_add(100, show_pulse)
+    def __on_cmd_out(self, _, cmd_out: str):
+        GLib.idle_add(self.__write_progress, cmd_out)
 
+    def process_input(self):
         try:
-            for i in range(len(cmd_list)):
-                GLib.idle_add(init_progress, i, cmd_list)
-                p = subprocess.Popen(
-                    shlex.split(cmd_list[i]),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    encoding="utf-8"
-                )
+            system_changes = self._application_state.get_application_state()
 
-                while True:
-                    std_out = p.stdout.readline()
-                    if std_out == "" and p.poll() is not None:
-                        GLib.idle_add(write_progress_log, "\n")
-                        break
+            process_executor = ProcessExecutor()
+            process_executor.connect("cmd_max", self.__on_cmd_max)
+            process_executor.connect("cmd_step", self.__on_cmd_step)
+            process_executor.connect("cmd_out", self.__on_cmd_out)
 
-                    GLib.idle_add(write_progress_log, std_out)
-                    sleep(0.02)
-
+            pulse_id = GLib.timeout_add(100, self.__show_pulse)
+            process_executor.process_input(system_changes)
             GLib.source_remove(pulse_id)
             self.__pb.set_fraction(1)
             self.__pb.set_text(

@@ -1,23 +1,14 @@
-from enum import Enum
-
-import gi
-gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
+from .. import DeploymentMode
 from . import PageContainer
 
 
 class PageDeployment(PageContainer):
     title = "Einsatzzweck"
 
-    class DeploymentMode(Enum):
-        READ_ONLY = 1
-        READ_SEND = 2
-        PROXY = 3
-
     def __init__(self):
         super().__init__()
-        self.deployment_mode = self.DeploymentMode.READ_ONLY
         self.__content()
 
     def __content(self):
@@ -33,17 +24,17 @@ class PageDeployment(PageContainer):
         # Create Radio Buttons
         rb1 = Gtk.RadioButton.new_with_label(
             None, "Ich möchte E-Mails lesen (standard)")
-        rb1.connect("toggled", self.__set_deployment_mode,
-                    self.DeploymentMode.READ_ONLY)
+        rb1.connect("toggled", self._application_state.set_deployment_mode,
+                    DeploymentMode.READ_ONLY)
         rb2 = Gtk.RadioButton.new_with_label_from_widget(
             rb1, "Ich möchte E-Mails lesen und versenden")
-        rb2.connect("toggled", self.__set_deployment_mode,
-                    self.DeploymentMode.READ_SEND)
+        rb2.connect("toggled", self._application_state.set_deployment_mode,
+                    DeploymentMode.READ_SEND)
         rb3 = Gtk.RadioButton.new_with_label_from_widget(
             rb1, "Ich möchte die Healbox als E-Mail-Proxy verwenden (experimentell)")
         rb3.set_sensitive(False)
-        rb3.connect("toggled", self.__set_deployment_mode,
-                    self.DeploymentMode.PROXY)
+        rb3.connect("toggled", self._application_state.set_deployment_mode,
+                    DeploymentMode.PROXY)
 
         container = Gtk.VBox()
         container.add(rb1)
@@ -51,6 +42,3 @@ class PageDeployment(PageContainer):
         container.add(rb3)
 
         self.add(container)
-
-    def __set_deployment_mode(self, _, deployment_mode: DeploymentMode):
-        self.deployment_mode = deployment_mode

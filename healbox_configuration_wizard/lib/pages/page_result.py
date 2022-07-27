@@ -1,5 +1,3 @@
-import gi
-gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
 from . import PageContainer
@@ -17,9 +15,9 @@ class PageResult(PageContainer):
         lbl = Gtk.Label()
         lbl.set_justify(Gtk.Justification.LEFT)
         lbl.set_label(f"""
-Das System ({self.hostname}) wurde angepasst.
-Ein neuer Benutzer {self.username} wurde angelegt.
+Das System ({self._application_state.hostname}) wurde angepasst.
+Ein neuer Benutzer {self._application_state.username} wurde angelegt.
 Starten Sie das System neu und melden Sie sich als neuer
-Nutzer {self.username} an.
+Nutzer {self._application_state.username} an.
 """)
         self.add(lbl)
